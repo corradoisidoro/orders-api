@@ -42,8 +42,10 @@ func (a *App) Start(ctx context.Context) error {
 
 	select {
 	case err := <-ch:
+		// Server crashed or failed to start
 		return err
 	case <-ctx.Done():
+		// Graceful shutdown
 		timeout, candel := context.WithTimeout(context.Background(), time.Second*10)
 		defer candel()
 
