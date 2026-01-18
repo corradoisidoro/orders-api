@@ -24,9 +24,12 @@ func (a *App) loadRoutes() {
 }
 
 func (a *App) loadOrderRoutes(router chi.Router) {
+	cfg := LoadConfig()
+	db, _ := ConnectDatabase(cfg)
+
 	orderHandler := &handler.Order{
-		Repo: &order.RedisRepo{
-			Client: a.rdb,
+		Repo: &order.OrderRepo{
+			DB: db,
 		},
 	}
 

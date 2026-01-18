@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,7 +16,7 @@ import (
 )
 
 type Order struct {
-	Repo *order.RedisRepo
+	Repo *order.OrderRepo
 }
 
 func (h *Order) Create(w http.ResponseWriter, r *http.Request) {
@@ -34,13 +33,12 @@ func (h *Order) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 
 	order := model.Order{
-		OrderID:    rand.Uint64(),
 		CustomerID: body.CustomerID,
 		LineItems:  body.LineItems,
 		CreatedAt:  &now,
 	}
 
-	err := h.Repo.Insert(r.Context(), order)
+	err := h.Repo.Insert(r.Context(), &order)
 	if err != nil {
 		fmt.Println("failed to insert:", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -182,7 +180,7 @@ func (h *Order) UpdateByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.Repo.Update(r.Context(), theOrder)
+	err = h.Repo.UpdateByID(r.Context(), &theOrder)
 	if err != nil {
 		fmt.Println("failed to insert:", err)
 		w.WriteHeader(http.StatusInternalServerError)
