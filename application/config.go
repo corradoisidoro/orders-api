@@ -12,7 +12,7 @@ type Config struct {
 
 func LoadConfig() Config {
 	cfg := Config{
-		DatabaseDSN: "orders_db",
+		DatabaseDSN: "orders.db",
 		ServerPort:  3000,
 	}
 

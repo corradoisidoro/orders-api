@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 
 	"github.com/corradoisidoro/orders-api/model"
 	"github.com/corradoisidoro/orders-api/repository/order"
@@ -21,7 +20,7 @@ type Order struct {
 
 func (h *Order) Create(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		CustomerID uuid.UUID        `json:"customer_id"`
+		CustomerID int64            `json:"customer_id,string"`
 		LineItems  []model.LineItem `json:"line_items"`
 	}
 
@@ -64,7 +63,7 @@ func (h *Order) List(w http.ResponseWriter, r *http.Request) {
 
 	const decimal = 10
 	const bitSize = 64
-	cursor, err := strconv.ParseUint(cursorStr, decimal, bitSize)
+	cursor, err := strconv.ParseInt(cursorStr, decimal, bitSize)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -83,7 +82,7 @@ func (h *Order) List(w http.ResponseWriter, r *http.Request) {
 
 	var response struct {
 		Items []model.Order `json:"items"`
-		Next  uint64        `json:"next,omitempty"`
+		Next  int64         `json:"next,omitempty"`
 	}
 	response.Items = res.Orders
 	response.Next = res.Cursor
@@ -104,7 +103,7 @@ func (h *Order) GetByID(w http.ResponseWriter, r *http.Request) {
 	const base = 10
 	const bitSize = 64
 
-	orderID, err := strconv.ParseUint(idParam, base, bitSize)
+	orderID, err := strconv.ParseInt(idParam, base, bitSize)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -142,7 +141,7 @@ func (h *Order) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	const base = 10
 	const bitSize = 64
 
-	orderID, err := strconv.ParseUint(idParam, base, bitSize)
+	orderID, err := strconv.ParseInt(idParam, base, bitSize)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -200,7 +199,7 @@ func (h *Order) DeleteByID(w http.ResponseWriter, r *http.Request) {
 	const base = 10
 	const bitSize = 64
 
-	orderID, err := strconv.ParseUint(idParam, base, bitSize)
+	orderID, err := strconv.ParseInt(idParam, base, bitSize)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
