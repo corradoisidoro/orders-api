@@ -79,7 +79,7 @@ func TestOrderHandler_Create_Success(t *testing.T) {
 	h := handler.Order{Repo: mockRepo}
 
 	body := map[string]any{
-		"customer_id": 1,
+		"customer_id": "1",
 		"line_items":  []model.LineItem{},
 	}
 
@@ -129,7 +129,7 @@ func TestOrderHandler_Create_InsertFails(t *testing.T) {
 
 	h := handler.Order{Repo: mockRepo}
 
-	body := map[string]any{"customer_id": 1}
+	body := map[string]any{"customer_id": "1"}
 	req := newRequest(http.MethodPost, "/orders", body)
 	rr := newRecorder()
 
