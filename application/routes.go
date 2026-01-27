@@ -10,32 +10,33 @@ import (
 )
 
 func (a *App) loadRoutes() {
-	router := chi.NewRouter()
+	r := chi.NewRouter()
 
-	router.Use(middleware.Logger)
+	// Recommended middleware stack
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	// Health check
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	router.Route("/orders", a.loadOrderRoutes)
+	// Domain routes
+	r.Route("/orders", a.loadOrderRoutes)
 
-	a.router = router
+	a.router = r
 }
 
-func (a *App) loadOrderRoutes(router chi.Router) {
-	cfg := LoadConfig()
-	db, _ := ConnectDatabase(cfg)
+func (a *App) loadOrderRoutes(r chi.Router) {
+	// Use the DB already injected into App
+	orderRepo := order.NewOrderRepo(a.DB)
+	orderHandler := &handler.Order{Repo: orderRepo}
 
-	orderHandler := &handler.Order{
-		Repo: &order.OrderRepo{
-			DB: db,
-		},
-	}
-
-	router.Post("/", orderHandler.Create)
-	router.Get("/", orderHandler.List)
-	router.Get("/{id}", orderHandler.GetByID)
-	router.Put("/{id}", orderHandler.UpdateByID)
-	router.Delete("/{id}", orderHandler.DeleteByID)
+	r.Post("/", orderHandler.Create)
+	r.Get("/", orderHandler.List)
+	r.Get("/{id}", orderHandler.GetByID)
+	r.Patch("/{id}", orderHandler.UpdateByID) // PATCH for partial update
+	r.Delete("/{id}", orderHandler.DeleteByID)
 }

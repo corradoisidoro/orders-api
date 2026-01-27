@@ -1,6 +1,7 @@
 package application
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -10,17 +11,25 @@ type Config struct {
 	DatabaseDSN string
 }
 
-func LoadConfig() Config {
+func LoadConfig() (Config, error) {
 	cfg := Config{
-		DatabaseDSN: "orders.db",
 		ServerPort:  3000,
+		DatabaseDSN: "orders.db",
 	}
 
-	if serverPort, exists := os.LookupEnv("SERVER_PORT"); exists {
-		if port, err := strconv.ParseUint(serverPort, 10, 16); err == nil {
-			cfg.ServerPort = uint16(port)
+	// SERVER_PORT override
+	if portStr := os.Getenv("SERVER_PORT"); portStr != "" {
+		port, err := strconv.ParseUint(portStr, 10, 16)
+		if err != nil {
+			return cfg, fmt.Errorf("invalid SERVER_PORT: %w", err)
 		}
+		cfg.ServerPort = uint16(port)
 	}
 
-	return cfg
+	// DATABASE_DSN override
+	if dsn := os.Getenv("DATABASE_DSN"); dsn != "" {
+		cfg.DatabaseDSN = dsn
+	}
+
+	return cfg, nil
 }
