@@ -44,7 +44,9 @@ func (r *OrderRepo) FindAll(ctx context.Context, page Page) (Result, error) {
 		query = query.Limit(int(page.Size))
 	}
 
-	if err := query.Find(&orders).Error; err != nil {
+	if err := query.
+		Preload("LineItems").
+		Find(&orders).Error; err != nil {
 		return Result{}, fmt.Errorf("find all orders: %w", err)
 	}
 
@@ -64,6 +66,7 @@ func (r *OrderRepo) FindByID(ctx context.Context, id int64) (model.Order, error)
 
 	var order model.Order
 	result := r.DB.WithContext(ctx).
+		Preload("LineItems").
 		Where(orderIDColumn+" = ?", id).
 		First(&order)
 
