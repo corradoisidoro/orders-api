@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/corradoisidoro/orders-api/handler"
-	"github.com/corradoisidoro/orders-api/model"
-	"github.com/corradoisidoro/orders-api/repository/order"
+	"github.com/corradoisidoro/orders-api/internal/handler"
+	"github.com/corradoisidoro/orders-api/internal/model"
+	"github.com/corradoisidoro/orders-api/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,7 @@ import (
 
 type mockOrderRepo struct {
 	InsertFn     func(ctx context.Context, o *model.Order) error
-	FindAllFn    func(ctx context.Context, p order.Page) (order.Result, error)
+	FindAllFn    func(ctx context.Context, p repository.Page) (repository.Result, error)
 	FindByIDFn   func(ctx context.Context, id int64) (model.Order, error)
 	UpdateByIDFn func(ctx context.Context, o *model.Order) error
 	DeleteByIDFn func(ctx context.Context, id int64) error
@@ -34,7 +34,7 @@ type mockOrderRepo struct {
 func (m *mockOrderRepo) Insert(ctx context.Context, o *model.Order) error {
 	return m.InsertFn(ctx, o)
 }
-func (m *mockOrderRepo) FindAll(ctx context.Context, p order.Page) (order.Result, error) {
+func (m *mockOrderRepo) FindAll(ctx context.Context, p repository.Page) (repository.Result, error) {
 	return m.FindAllFn(ctx, p)
 }
 func (m *mockOrderRepo) FindByID(ctx context.Context, id int64) (model.Order, error) {
@@ -76,7 +76,7 @@ func TestOrderHandler_Create_Success(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]any{
 		"customer_id": "1",
@@ -97,7 +97,7 @@ func TestOrderHandler_Create_Success(t *testing.T) {
 
 func TestOrderHandler_Create_InvalidJSON(t *testing.T) {
 	mockRepo := &mockOrderRepo{}
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := httptest.NewRequest(http.MethodPost, "/orders", bytes.NewBufferString("{invalid"))
 	rr := newRecorder()
@@ -109,7 +109,7 @@ func TestOrderHandler_Create_InvalidJSON(t *testing.T) {
 
 func TestOrderHandler_Create_InvalidCustomerID(t *testing.T) {
 	mockRepo := &mockOrderRepo{}
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]any{"customer_id": 0}
 	req := newRequest(http.MethodPost, "/orders", body)
@@ -127,7 +127,7 @@ func TestOrderHandler_Create_InsertFails(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]any{"customer_id": "1"}
 	req := newRequest(http.MethodPost, "/orders", body)
@@ -144,8 +144,8 @@ func TestOrderHandler_Create_InsertFails(t *testing.T) {
 
 func TestOrderHandler_List_Success(t *testing.T) {
 	mockRepo := &mockOrderRepo{
-		FindAllFn: func(ctx context.Context, p order.Page) (order.Result, error) {
-			return order.Result{
+		FindAllFn: func(ctx context.Context, p repository.Page) (repository.Result, error) {
+			return repository.Result{
 				Orders: []model.Order{
 					{OrderID: 1, LineItems: nil},
 				},
@@ -154,7 +154,7 @@ func TestOrderHandler_List_Success(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders?cursor=0", nil)
 	rr := newRecorder()
@@ -174,7 +174,7 @@ func TestOrderHandler_List_Success(t *testing.T) {
 }
 
 func TestOrderHandler_List_InvalidCursor(t *testing.T) {
-	h := handler.Order{Repo: &mockOrderRepo{}}
+	h := handler.OrderHandler{Repo: &mockOrderRepo{}}
 
 	req := newRequest(http.MethodGet, "/orders?cursor=abc", nil)
 	rr := newRecorder()
@@ -186,12 +186,12 @@ func TestOrderHandler_List_InvalidCursor(t *testing.T) {
 
 func TestOrderHandler_List_RepoError(t *testing.T) {
 	mockRepo := &mockOrderRepo{
-		FindAllFn: func(ctx context.Context, p order.Page) (order.Result, error) {
-			return order.Result{}, errors.New("db error")
+		FindAllFn: func(ctx context.Context, p repository.Page) (repository.Result, error) {
+			return repository.Result{}, errors.New("db error")
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders?cursor=0", nil)
 	rr := newRecorder()
@@ -212,7 +212,7 @@ func TestOrderHandler_GetByID_Success(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders/5", nil)
 	rr := newRecorder()
@@ -227,7 +227,7 @@ func TestOrderHandler_GetByID_Success(t *testing.T) {
 }
 
 func TestOrderHandler_GetByID_InvalidID(t *testing.T) {
-	h := handler.Order{Repo: &mockOrderRepo{}}
+	h := handler.OrderHandler{Repo: &mockOrderRepo{}}
 
 	req := newRequest(http.MethodGet, "/orders/abc", nil)
 	rr := newRecorder()
@@ -244,11 +244,11 @@ func TestOrderHandler_GetByID_InvalidID(t *testing.T) {
 func TestOrderHandler_GetByID_NotFound(t *testing.T) {
 	mockRepo := &mockOrderRepo{
 		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{}, order.ErrNotExist
+			return model.Order{}, repository.ErrNotExist
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders/5", nil)
 	rr := newRecorder()
@@ -269,7 +269,7 @@ func TestOrderHandler_GetByID_RepoError(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders/5", nil)
 	rr := newRecorder()
@@ -297,7 +297,7 @@ func TestOrderHandler_UpdateByID_Shipped_Success(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "shipped"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
@@ -323,7 +323,7 @@ func TestOrderHandler_UpdateByID_Completed_Success(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "completed"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
@@ -339,7 +339,7 @@ func TestOrderHandler_UpdateByID_Completed_Success(t *testing.T) {
 }
 
 func TestOrderHandler_UpdateByID_InvalidJSON(t *testing.T) {
-	h := handler.Order{Repo: &mockOrderRepo{}}
+	h := handler.OrderHandler{Repo: &mockOrderRepo{}}
 
 	req := httptest.NewRequest(http.MethodPatch, "/orders/5", bytes.NewBufferString("{invalid"))
 	rr := newRecorder()
@@ -360,7 +360,7 @@ func TestOrderHandler_UpdateByID_InvalidStatus(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "unknown"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
@@ -378,11 +378,11 @@ func TestOrderHandler_UpdateByID_InvalidStatus(t *testing.T) {
 func TestOrderHandler_UpdateByID_NotFound(t *testing.T) {
 	mockRepo := &mockOrderRepo{
 		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{}, order.ErrNotExist
+			return model.Order{}, repository.ErrNotExist
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "shipped"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
@@ -407,7 +407,7 @@ func TestOrderHandler_UpdateByID_RepoError(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "shipped"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
@@ -433,7 +433,7 @@ func TestOrderHandler_DeleteByID_Success(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodDelete, "/orders/5", nil)
 	rr := newRecorder()
@@ -450,11 +450,11 @@ func TestOrderHandler_DeleteByID_Success(t *testing.T) {
 func TestOrderHandler_DeleteByID_NotFound(t *testing.T) {
 	mockRepo := &mockOrderRepo{
 		DeleteByIDFn: func(ctx context.Context, id int64) error {
-			return order.ErrNotExist
+			return repository.ErrNotExist
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodDelete, "/orders/5", nil)
 	rr := newRecorder()
@@ -475,7 +475,7 @@ func TestOrderHandler_DeleteByID_RepoError(t *testing.T) {
 		},
 	}
 
-	h := handler.Order{Repo: mockRepo}
+	h := handler.OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodDelete, "/orders/5", nil)
 	rr := newRecorder()

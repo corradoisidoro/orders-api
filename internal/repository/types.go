@@ -1,10 +1,10 @@
-package order
+package repository
 
 import (
 	"context"
 	"errors"
 
-	"github.com/corradoisidoro/orders-api/model"
+	"github.com/corradoisidoro/orders-api/internal/model"
 )
 
 // OrderRepository defines the contract for order persistence.

@@ -3,7 +3,7 @@ package application
 import (
 	"fmt"
 
-	"github.com/corradoisidoro/orders-api/model"
+	"github.com/corradoisidoro/orders-api/internal/model"
 	"gorm.io/gorm"
 )
 

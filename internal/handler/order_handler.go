@@ -5,15 +5,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/corradoisidoro/orders-api/model"
-	"github.com/corradoisidoro/orders-api/repository/order"
+	"github.com/corradoisidoro/orders-api/internal/model"
+	"github.com/corradoisidoro/orders-api/internal/repository"
 )
 
-type Order struct {
-	Repo order.OrderRepository
+type OrderHandler struct {
+	Repo repository.OrderRepository
 }
 
-func (h *Order) Create(w http.ResponseWriter, r *http.Request) {
+func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		CustomerID int64            `json:"customer_id,string"`
 		LineItems  []model.LineItem `json:"line_items"`
@@ -50,7 +50,7 @@ func (h *Order) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, o)
 }
 
-func (h *Order) List(w http.ResponseWriter, r *http.Request) {
+func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 	cursor, ok := parseQueryInt(w, r, "cursor", 0)
 	if !ok {
 		return
@@ -58,7 +58,7 @@ func (h *Order) List(w http.ResponseWriter, r *http.Request) {
 
 	const defaultPageSize = 50
 
-	res, err := h.Repo.FindAll(r.Context(), order.Page{
+	res, err := h.Repo.FindAll(r.Context(), repository.Page{
 		Offset: cursor,
 		Size:   defaultPageSize,
 	})
@@ -84,7 +84,7 @@ func (h *Order) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
-func (h *Order) GetByID(w http.ResponseWriter, r *http.Request) {
+func (h *OrderHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseID(w, r)
 	if !ok {
 		return
@@ -92,7 +92,7 @@ func (h *Order) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	o, err := h.Repo.FindByID(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, order.ErrNotExist) {
+		if errors.Is(err, repository.ErrNotExist) {
 			writeError(w, http.StatusNotFound, "order not found")
 			return
 		}
@@ -107,7 +107,7 @@ func (h *Order) GetByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, o)
 }
 
-func (h *Order) UpdateByID(w http.ResponseWriter, r *http.Request) {
+func (h *OrderHandler) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Status string `json:"status"`
 	}
@@ -124,7 +124,7 @@ func (h *Order) UpdateByID(w http.ResponseWriter, r *http.Request) {
 
 	o, err := h.Repo.FindByID(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, order.ErrNotExist) {
+		if errors.Is(err, repository.ErrNotExist) {
 			writeError(w, http.StatusNotFound, "order not found")
 			return
 		}
@@ -166,7 +166,7 @@ func (h *Order) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, o)
 }
 
-func (h *Order) DeleteByID(w http.ResponseWriter, r *http.Request) {
+func (h *OrderHandler) DeleteByID(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseID(w, r)
 	if !ok {
 		return
@@ -174,7 +174,7 @@ func (h *Order) DeleteByID(w http.ResponseWriter, r *http.Request) {
 
 	err := h.Repo.DeleteByID(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, order.ErrNotExist) {
+		if errors.Is(err, repository.ErrNotExist) {
 			writeError(w, http.StatusNotFound, "order not found")
 			return
 		}

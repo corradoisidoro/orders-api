@@ -3,8 +3,8 @@ package application
 import (
 	"net/http"
 
-	"github.com/corradoisidoro/orders-api/handler"
-	"github.com/corradoisidoro/orders-api/repository/order"
+	"github.com/corradoisidoro/orders-api/internal/handler"
+	"github.com/corradoisidoro/orders-api/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -31,8 +31,8 @@ func (a *App) loadRoutes() {
 
 func (a *App) loadOrderRoutes(r chi.Router) {
 	// Use the DB already injected into App
-	orderRepo := order.NewOrderRepo(a.DB)
-	orderHandler := &handler.Order{Repo: orderRepo}
+	orderRepo := repository.NewOrderRepo(a.DB)
+	orderHandler := &handler.OrderHandler{Repo: orderRepo}
 
 	r.Post("/", orderHandler.Create)
 	r.Get("/", orderHandler.List)

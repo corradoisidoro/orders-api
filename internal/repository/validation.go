@@ -1,9 +1,9 @@
-package order
+package repository
 
 import (
 	"fmt"
 
-	"github.com/corradoisidoro/orders-api/model"
+	"github.com/corradoisidoro/orders-api/internal/model"
 )
 
 // validateID ensures the ID is positive.
