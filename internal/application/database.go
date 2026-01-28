@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func ConnectDatabase(cfg Config) (*gorm.DB, error) {
@@ -13,7 +14,9 @@ func ConnectDatabase(cfg Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("missing database DSN in config")
 	}
 
-	db, err := gorm.Open(sqlite.Open(cfg.DatabaseDSN), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.DatabaseDSN), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -24,13 +27,16 @@ func ConnectDatabase(cfg Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 
-	// SQLite allows only one writer; these settings prevent locking issues
-	sqlDB.SetMaxOpenConns(1)
-	sqlDB.SetMaxIdleConns(1)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	// Postgres connection pool
+	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
 
-	// Improve concurrency for SQLite
-	db.Exec("PRAGMA journal_mode = WAL;")
+	// Ping to ensure DB is reachable
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("database not reachable: %w", err)
+	}
 
 	return db, nil
 }

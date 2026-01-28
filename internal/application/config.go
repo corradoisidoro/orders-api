@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -12,12 +14,16 @@ type Config struct {
 }
 
 func LoadConfig() (Config, error) {
-	cfg := Config{
-		ServerPort:  3000,
-		DatabaseDSN: "orders.db",
+	if err := godotenv.Load(); err != nil {
+		return Config{}, fmt.Errorf(".env file missing or unreadable: %w", err)
 	}
 
-	// SERVER_PORT override
+	cfg := Config{
+		ServerPort:  3000,
+		DatabaseDSN: "",
+	}
+
+	// SERVER_PORT
 	if portStr := os.Getenv("SERVER_PORT"); portStr != "" {
 		port, err := strconv.ParseUint(portStr, 10, 16)
 		if err != nil {
@@ -26,10 +32,12 @@ func LoadConfig() (Config, error) {
 		cfg.ServerPort = uint16(port)
 	}
 
-	// DATABASE_DSN override
-	if dsn := os.Getenv("DATABASE_DSN"); dsn != "" {
-		cfg.DatabaseDSN = dsn
+	// DATABASE_DSN
+	dsn := os.Getenv("DATABASE_DSN")
+	if dsn == "" {
+		return cfg, fmt.Errorf("DATABASE_DSN is required but not set")
 	}
+	cfg.DatabaseDSN = dsn
 
 	return cfg, nil
 }

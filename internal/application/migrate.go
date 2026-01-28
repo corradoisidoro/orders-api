@@ -14,10 +14,9 @@ func Migrate(db *gorm.DB) error {
 		return fmt.Errorf("cannot run migrations: db is nil")
 	}
 
-	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.AutoMigrate(&model.Order{}, &model.LineItem{}); err != nil {
-			return fmt.Errorf("database migration failed: %w", err)
-		}
-		return nil
-	})
+	if err := db.AutoMigrate(&model.Order{}, &model.LineItem{}); err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	return nil
 }
