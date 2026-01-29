@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -12,21 +13,21 @@ import (
 )
 
 func ConnectDatabase(cfg application.Config) (*gorm.DB, error) {
-	if cfg.DatabaseDSN == "" {
-		return nil, fmt.Errorf("missing database DSN in config")
+	if strings.TrimSpace(cfg.DatabaseDSN) == "" {
+		return nil, fmt.Errorf("database: missing DSN")
 	}
 
 	db, err := gorm.Open(postgres.Open(cfg.DatabaseDSN), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("database: connect failed: %w", err)
 	}
 
 	// Configure connection pool
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
+		return nil, fmt.Errorf("database: sql.DB unwrap failed: %w", err)
 	}
 
 	// Postgres connection pool
@@ -37,7 +38,7 @@ func ConnectDatabase(cfg application.Config) (*gorm.DB, error) {
 
 	// Ping to ensure DB is reachable
 	if err := sqlDB.Ping(); err != nil {
-		return nil, fmt.Errorf("database not reachable: %w", err)
+		return nil, fmt.Errorf("database: ping failed: %w", err)
 	}
 
 	return db, nil
