@@ -1,4 +1,4 @@
-package order_test
+package repository
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/corradoisidoro/orders-api/internal/model"
-	"github.com/corradoisidoro/orders-api/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
@@ -39,7 +38,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 
 func TestInsert_Success(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 	ctx := context.Background()
 
 	o := &model.Order{CustomerID: 1}
@@ -51,20 +50,20 @@ func TestInsert_Success(t *testing.T) {
 
 func TestInsert_Fails_WhenNilOrder(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.Insert(context.Background(), nil)
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 func TestInsert_Fails_WhenCustomerIDZero(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.Insert(context.Background(), &model.Order{CustomerID: 0})
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 //
@@ -73,14 +72,14 @@ func TestInsert_Fails_WhenCustomerIDZero(t *testing.T) {
 
 func TestFindAll_Success(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 	ctx := context.Background()
 
 	for i := 1; i <= 3; i++ {
 		require.NoError(t, repo.Insert(ctx, &model.Order{CustomerID: int64(i)}))
 	}
 
-	result, err := repo.FindAll(ctx, repository.Page{Size: 2, Offset: 0})
+	result, err := repo.FindAll(ctx, Page{Size: 2, Offset: 0})
 
 	require.NoError(t, err)
 	assert.Len(t, result.Orders, 2)
@@ -89,9 +88,9 @@ func TestFindAll_Success(t *testing.T) {
 
 func TestFindAll_EmptyResult(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
-	result, err := repo.FindAll(context.Background(), repository.Page{Size: 10, Offset: 0})
+	result, err := repo.FindAll(context.Background(), Page{Size: 10, Offset: 0})
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Orders)
@@ -100,12 +99,12 @@ func TestFindAll_EmptyResult(t *testing.T) {
 
 func TestFindAll_OffsetBeyondRange(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 	ctx := context.Background()
 
 	require.NoError(t, repo.Insert(ctx, &model.Order{CustomerID: 1}))
 
-	result, err := repo.FindAll(ctx, repository.Page{Size: 10, Offset: 50})
+	result, err := repo.FindAll(ctx, Page{Size: 10, Offset: 50})
 
 	require.NoError(t, err)
 	assert.Empty(t, result.Orders)
@@ -114,24 +113,24 @@ func TestFindAll_OffsetBeyondRange(t *testing.T) {
 
 func TestFindAll_Fails_WhenNegativeOffset(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
-	result, err := repo.FindAll(context.Background(), repository.Page{Size: 10, Offset: -1})
+	result, err := repo.FindAll(context.Background(), Page{Size: 10, Offset: -1})
 
 	assert.Error(t, err)
 	assert.Empty(t, result.Orders)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 func TestFindAll_Fails_WhenNegativeSize(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
-	result, err := repo.FindAll(context.Background(), repository.Page{Size: -5, Offset: 0})
+	result, err := repo.FindAll(context.Background(), Page{Size: -5, Offset: 0})
 
 	assert.Error(t, err)
 	assert.Empty(t, result.Orders)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 //
@@ -140,7 +139,7 @@ func TestFindAll_Fails_WhenNegativeSize(t *testing.T) {
 
 func TestFindByID_Success(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 	ctx := context.Background()
 
 	o := &model.Order{CustomerID: 1}
@@ -154,19 +153,19 @@ func TestFindByID_Success(t *testing.T) {
 
 func TestFindByID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	_, err := repo.FindByID(context.Background(), 999)
-	assert.ErrorIs(t, err, repository.ErrNotExist)
+	assert.ErrorIs(t, err, ErrNotExist)
 }
 
 func TestFindByID_Fails_WhenIDZero(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	_, err := repo.FindByID(context.Background(), 0)
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 //
@@ -175,7 +174,7 @@ func TestFindByID_Fails_WhenIDZero(t *testing.T) {
 
 func TestUpdateByID_Success(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 	ctx := context.Background()
 
 	o := &model.Order{CustomerID: 1}
@@ -191,37 +190,37 @@ func TestUpdateByID_Success(t *testing.T) {
 
 func TestUpdateByID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.UpdateByID(context.Background(), &model.Order{OrderID: 999, CustomerID: 1})
-	assert.ErrorIs(t, err, repository.ErrNotExist)
+	assert.ErrorIs(t, err, ErrNotExist)
 }
 
 func TestUpdateByID_Fails_WhenNilOrder(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.UpdateByID(context.Background(), nil)
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 func TestUpdateByID_Fails_WhenOrderIDZero(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.UpdateByID(context.Background(), &model.Order{OrderID: 0, CustomerID: 1})
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 func TestUpdateByID_Fails_WhenCustomerIDZero(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.UpdateByID(context.Background(), &model.Order{OrderID: 1, CustomerID: 0})
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }
 
 //
@@ -230,7 +229,7 @@ func TestUpdateByID_Fails_WhenCustomerIDZero(t *testing.T) {
 
 func TestDeleteByID_Success(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 	ctx := context.Background()
 
 	o := &model.Order{CustomerID: 1}
@@ -239,22 +238,22 @@ func TestDeleteByID_Success(t *testing.T) {
 	require.NoError(t, repo.DeleteByID(ctx, o.OrderID))
 
 	_, err := repo.FindByID(ctx, o.OrderID)
-	assert.ErrorIs(t, err, repository.ErrNotExist)
+	assert.ErrorIs(t, err, ErrNotExist)
 }
 
 func TestDeleteByID_NotFound(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.DeleteByID(context.Background(), 999)
-	assert.ErrorIs(t, err, repository.ErrNotExist)
+	assert.ErrorIs(t, err, ErrNotExist)
 }
 
 func TestDeleteByID_Fails_WhenIDZero(t *testing.T) {
 	db := setupTestDB(t)
-	repo := repository.NewOrderRepo(db)
+	repo := NewOrderRepo(db)
 
 	err := repo.DeleteByID(context.Background(), 0)
 	assert.Error(t, err)
-	assert.ErrorIs(t, err, repository.ErrInvalidInput)
+	assert.ErrorIs(t, err, ErrInvalidInput)
 }

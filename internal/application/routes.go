@@ -2,41 +2,44 @@ package application
 
 import (
 	"net/http"
+	"time"
 
-	"github.com/corradoisidoro/orders-api/internal/handler"
-	"github.com/corradoisidoro/orders-api/internal/repository"
+	appmw "github.com/corradoisidoro/orders-api/internal/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
 func (a *App) loadRoutes() {
 	r := chi.NewRouter()
 
-	// Recommended middleware stack
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	// Core middleware
+	r.Use(chimw.RequestID)
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Logger)
+	r.Use(chimw.Recoverer)
+	r.Use(chimw.Timeout(60 * time.Second))
+
+	// App middleware
+	r.Use(appmw.RateLimitMiddleware(
+		a.config.RateLimitRequests,
+		a.config.RateLimitWindowSecs,
+	))
 
 	// Health check
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// Domain routes
+	// API routes
 	r.Route("/orders", a.loadOrderRoutes)
 
 	a.router = r
 }
 
 func (a *App) loadOrderRoutes(r chi.Router) {
-	// Use the DB already injected into App
-	orderRepo := repository.NewOrderRepo(a.DB)
-	orderHandler := &handler.OrderHandler{Repo: orderRepo}
-
-	r.Post("/", orderHandler.Create)
-	r.Get("/", orderHandler.List)
-	r.Get("/{id}", orderHandler.GetByID)
-	r.Patch("/{id}", orderHandler.UpdateByID) // PATCH for partial update
-	r.Delete("/{id}", orderHandler.DeleteByID)
+	r.Post("/", a.orderHandler.Create)
+	r.Get("/", a.orderHandler.List)
+	r.Get("/{id}", a.orderHandler.GetByID)
+	r.Patch("/{id}", a.orderHandler.UpdateByID)
+	r.Delete("/{id}", a.orderHandler.DeleteByID)
 }

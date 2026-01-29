@@ -1,4 +1,4 @@
-package handler_test
+package handler
 
 import (
 	"bytes"
@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/corradoisidoro/orders-api/internal/handler"
 	"github.com/corradoisidoro/orders-api/internal/model"
 	"github.com/corradoisidoro/orders-api/internal/repository"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +28,18 @@ type mockOrderRepo struct {
 	FindByIDFn   func(ctx context.Context, id int64) (model.Order, error)
 	UpdateByIDFn func(ctx context.Context, o *model.Order) error
 	DeleteByIDFn func(ctx context.Context, id int64) error
+}
+
+func newMockRepo() *mockOrderRepo {
+	return &mockOrderRepo{
+		InsertFn: func(ctx context.Context, o *model.Order) error { return nil },
+		FindAllFn: func(ctx context.Context, p repository.Page) (repository.Result, error) {
+			return repository.Result{}, nil
+		},
+		FindByIDFn:   func(ctx context.Context, id int64) (model.Order, error) { return model.Order{}, nil },
+		UpdateByIDFn: func(ctx context.Context, o *model.Order) error { return nil },
+		DeleteByIDFn: func(ctx context.Context, id int64) error { return nil },
+	}
 }
 
 func (m *mockOrderRepo) Insert(ctx context.Context, o *model.Order) error {
@@ -56,12 +67,22 @@ func newRequest(method, path string, body any) *http.Request {
 	if body != nil {
 		_ = json.NewEncoder(&buf).Encode(body)
 	}
-	req := httptest.NewRequest(method, path, &buf)
-	return req
+	return httptest.NewRequest(method, path, &buf)
 }
 
 func newRecorder() *httptest.ResponseRecorder {
 	return httptest.NewRecorder()
+}
+
+func withRouteParam(req *http.Request, key, value string) *http.Request {
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add(key, value)
+	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+}
+
+func decodeResponseJSON(t *testing.T, body []byte, v any) {
+	t.Helper()
+	require.NoError(t, json.Unmarshal(body, v))
 }
 
 //
@@ -69,14 +90,13 @@ func newRecorder() *httptest.ResponseRecorder {
 //
 
 func TestOrderHandler_Create_Success(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		InsertFn: func(ctx context.Context, o *model.Order) error {
-			o.OrderID = 123
-			return nil
-		},
+	mockRepo := newMockRepo()
+	mockRepo.InsertFn = func(ctx context.Context, o *model.Order) error {
+		o.OrderID = 123
+		return nil
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	body := map[string]any{
 		"customer_id": "1",
@@ -91,13 +111,12 @@ func TestOrderHandler_Create_Success(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, rr.Code)
 
 	var resp model.Order
-	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	decodeResponseJSON(t, rr.Body.Bytes(), &resp)
 	assert.Equal(t, int64(123), resp.OrderID)
 }
 
 func TestOrderHandler_Create_InvalidJSON(t *testing.T) {
-	mockRepo := &mockOrderRepo{}
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: newMockRepo()}
 
 	req := httptest.NewRequest(http.MethodPost, "/orders", bytes.NewBufferString("{invalid"))
 	rr := newRecorder()
@@ -108,8 +127,7 @@ func TestOrderHandler_Create_InvalidJSON(t *testing.T) {
 }
 
 func TestOrderHandler_Create_InvalidCustomerID(t *testing.T) {
-	mockRepo := &mockOrderRepo{}
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: newMockRepo()}
 
 	body := map[string]any{"customer_id": 0}
 	req := newRequest(http.MethodPost, "/orders", body)
@@ -121,13 +139,12 @@ func TestOrderHandler_Create_InvalidCustomerID(t *testing.T) {
 }
 
 func TestOrderHandler_Create_InsertFails(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		InsertFn: func(ctx context.Context, o *model.Order) error {
-			return errors.New("db error")
-		},
+	mockRepo := newMockRepo()
+	mockRepo.InsertFn = func(ctx context.Context, o *model.Order) error {
+		return errors.New("db error")
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	body := map[string]any{"customer_id": "1"}
 	req := newRequest(http.MethodPost, "/orders", body)
@@ -143,18 +160,17 @@ func TestOrderHandler_Create_InsertFails(t *testing.T) {
 //
 
 func TestOrderHandler_List_Success(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindAllFn: func(ctx context.Context, p repository.Page) (repository.Result, error) {
-			return repository.Result{
-				Orders: []model.Order{
-					{OrderID: 1, LineItems: nil},
-				},
-				Cursor: 10,
-			}, nil
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindAllFn = func(ctx context.Context, p repository.Page) (repository.Result, error) {
+		return repository.Result{
+			Orders: []model.Order{
+				{OrderID: 1, LineItems: nil},
+			},
+			Cursor: 10,
+		}, nil
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders?cursor=0", nil)
 	rr := newRecorder()
@@ -167,14 +183,14 @@ func TestOrderHandler_List_Success(t *testing.T) {
 		Items []model.Order `json:"items"`
 		Next  int64         `json:"next"`
 	}
-	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	decodeResponseJSON(t, rr.Body.Bytes(), &resp)
 
 	assert.Equal(t, int64(10), resp.Next)
 	assert.Equal(t, []model.LineItem{}, resp.Items[0].LineItems)
 }
 
 func TestOrderHandler_List_InvalidCursor(t *testing.T) {
-	h := handler.OrderHandler{Repo: &mockOrderRepo{}}
+	h := OrderHandler{Repo: newMockRepo()}
 
 	req := newRequest(http.MethodGet, "/orders?cursor=abc", nil)
 	rr := newRecorder()
@@ -185,13 +201,12 @@ func TestOrderHandler_List_InvalidCursor(t *testing.T) {
 }
 
 func TestOrderHandler_List_RepoError(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindAllFn: func(ctx context.Context, p repository.Page) (repository.Result, error) {
-			return repository.Result{}, errors.New("db error")
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindAllFn = func(ctx context.Context, p repository.Page) (repository.Result, error) {
+		return repository.Result{}, errors.New("db error")
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders?cursor=0", nil)
 	rr := newRecorder()
@@ -206,20 +221,16 @@ func TestOrderHandler_List_RepoError(t *testing.T) {
 //
 
 func TestOrderHandler_GetByID_Success(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{OrderID: id, LineItems: nil}, nil
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		return model.Order{OrderID: id, LineItems: nil}, nil
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders/5", nil)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.GetByID(rr, req)
 
@@ -227,14 +238,11 @@ func TestOrderHandler_GetByID_Success(t *testing.T) {
 }
 
 func TestOrderHandler_GetByID_InvalidID(t *testing.T) {
-	h := handler.OrderHandler{Repo: &mockOrderRepo{}}
+	h := OrderHandler{Repo: newMockRepo()}
 
 	req := newRequest(http.MethodGet, "/orders/abc", nil)
+	req = withRouteParam(req, "id", "abc")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "abc")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.GetByID(rr, req)
 
@@ -242,20 +250,16 @@ func TestOrderHandler_GetByID_InvalidID(t *testing.T) {
 }
 
 func TestOrderHandler_GetByID_NotFound(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{}, repository.ErrNotExist
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		return model.Order{}, repository.ErrNotExist
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders/5", nil)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.GetByID(rr, req)
 
@@ -263,20 +267,16 @@ func TestOrderHandler_GetByID_NotFound(t *testing.T) {
 }
 
 func TestOrderHandler_GetByID_RepoError(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{}, errors.New("db error")
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		return model.Order{}, errors.New("db error")
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodGet, "/orders/5", nil)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.GetByID(rr, req)
 
@@ -288,24 +288,20 @@ func TestOrderHandler_GetByID_RepoError(t *testing.T) {
 //
 
 func TestOrderHandler_UpdateByID_Shipped_Success(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{OrderID: id}, nil
-		},
-		UpdateByIDFn: func(ctx context.Context, o *model.Order) error {
-			return nil
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		return model.Order{OrderID: id}, nil
+	}
+	mockRepo.UpdateByIDFn = func(ctx context.Context, o *model.Order) error {
+		return nil
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "shipped"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.UpdateByID(rr, req)
 
@@ -313,25 +309,21 @@ func TestOrderHandler_UpdateByID_Shipped_Success(t *testing.T) {
 }
 
 func TestOrderHandler_UpdateByID_Completed_Success(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			now := time.Now().UTC()
-			return model.Order{OrderID: id, ShippedAt: &now}, nil
-		},
-		UpdateByIDFn: func(ctx context.Context, o *model.Order) error {
-			return nil
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		now := time.Now().UTC()
+		return model.Order{OrderID: id, ShippedAt: &now}, nil
+	}
+	mockRepo.UpdateByIDFn = func(ctx context.Context, o *model.Order) error {
+		return nil
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "completed"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.UpdateByID(rr, req)
 
@@ -339,14 +331,11 @@ func TestOrderHandler_UpdateByID_Completed_Success(t *testing.T) {
 }
 
 func TestOrderHandler_UpdateByID_InvalidJSON(t *testing.T) {
-	h := handler.OrderHandler{Repo: &mockOrderRepo{}}
+	h := OrderHandler{Repo: newMockRepo()}
 
 	req := httptest.NewRequest(http.MethodPatch, "/orders/5", bytes.NewBufferString("{invalid"))
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.UpdateByID(rr, req)
 
@@ -354,21 +343,17 @@ func TestOrderHandler_UpdateByID_InvalidJSON(t *testing.T) {
 }
 
 func TestOrderHandler_UpdateByID_InvalidStatus(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{OrderID: id}, nil
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		return model.Order{OrderID: id}, nil
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "unknown"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.UpdateByID(rr, req)
 
@@ -376,21 +361,17 @@ func TestOrderHandler_UpdateByID_InvalidStatus(t *testing.T) {
 }
 
 func TestOrderHandler_UpdateByID_NotFound(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{}, repository.ErrNotExist
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		return model.Order{}, repository.ErrNotExist
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "shipped"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.UpdateByID(rr, req)
 
@@ -398,24 +379,20 @@ func TestOrderHandler_UpdateByID_NotFound(t *testing.T) {
 }
 
 func TestOrderHandler_UpdateByID_RepoError(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		FindByIDFn: func(ctx context.Context, id int64) (model.Order, error) {
-			return model.Order{OrderID: id}, nil
-		},
-		UpdateByIDFn: func(ctx context.Context, o *model.Order) error {
-			return errors.New("db error")
-		},
+	mockRepo := newMockRepo()
+	mockRepo.FindByIDFn = func(ctx context.Context, id int64) (model.Order, error) {
+		return model.Order{OrderID: id}, nil
+	}
+	mockRepo.UpdateByIDFn = func(ctx context.Context, o *model.Order) error {
+		return errors.New("db error")
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	body := map[string]string{"status": "shipped"}
 	req := newRequest(http.MethodPatch, "/orders/5", body)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.UpdateByID(rr, req)
 
@@ -427,20 +404,16 @@ func TestOrderHandler_UpdateByID_RepoError(t *testing.T) {
 //
 
 func TestOrderHandler_DeleteByID_Success(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		DeleteByIDFn: func(ctx context.Context, id int64) error {
-			return nil
-		},
+	mockRepo := newMockRepo()
+	mockRepo.DeleteByIDFn = func(ctx context.Context, id int64) error {
+		return nil
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodDelete, "/orders/5", nil)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.DeleteByID(rr, req)
 
@@ -448,20 +421,16 @@ func TestOrderHandler_DeleteByID_Success(t *testing.T) {
 }
 
 func TestOrderHandler_DeleteByID_NotFound(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		DeleteByIDFn: func(ctx context.Context, id int64) error {
-			return repository.ErrNotExist
-		},
+	mockRepo := newMockRepo()
+	mockRepo.DeleteByIDFn = func(ctx context.Context, id int64) error {
+		return repository.ErrNotExist
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodDelete, "/orders/5", nil)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.DeleteByID(rr, req)
 
@@ -469,20 +438,16 @@ func TestOrderHandler_DeleteByID_NotFound(t *testing.T) {
 }
 
 func TestOrderHandler_DeleteByID_RepoError(t *testing.T) {
-	mockRepo := &mockOrderRepo{
-		DeleteByIDFn: func(ctx context.Context, id int64) error {
-			return errors.New("db error")
-		},
+	mockRepo := newMockRepo()
+	mockRepo.DeleteByIDFn = func(ctx context.Context, id int64) error {
+		return errors.New("db error")
 	}
 
-	h := handler.OrderHandler{Repo: mockRepo}
+	h := OrderHandler{Repo: mockRepo}
 
 	req := newRequest(http.MethodDelete, "/orders/5", nil)
+	req = withRouteParam(req, "id", "5")
 	rr := newRecorder()
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("id", "5")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	h.DeleteByID(rr, req)
 

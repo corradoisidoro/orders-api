@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/go-chi/chi/v5 v5.2.4
+	github.com/joho/godotenv v1.5.1
 	gorm.io/driver/postgres v1.6.0
 )
 
@@ -13,7 +14,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
