@@ -1,4 +1,4 @@
-package application
+package infrastructure
 
 import (
 	"fmt"
@@ -7,9 +7,11 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/corradoisidoro/orders-api/internal/application"
 )
 
-func ConnectDatabase(cfg Config) (*gorm.DB, error) {
+func ConnectDatabase(cfg application.Config) (*gorm.DB, error) {
 	if cfg.DatabaseDSN == "" {
 		return nil, fmt.Errorf("missing database DSN in config")
 	}

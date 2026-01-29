@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/corradoisidoro/orders-api/internal/application"
+	"github.com/corradoisidoro/orders-api/internal/infrastructure"
 )
 
 func main() {
@@ -17,7 +18,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := application.ConnectDatabase(cfg)
+	db, err := infrastructure.ConnectDatabase(cfg)
 	if err != nil {
 		fmt.Println("failed to connect to database:", err)
 		os.Exit(1)
@@ -26,7 +27,7 @@ func main() {
 	// CLI command: go run main.go migrate
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
 		fmt.Println("Running migrations...")
-		if err := application.Migrate(db); err != nil {
+		if err := infrastructure.Migrate(db); err != nil {
 			fmt.Println("migration failed:", err)
 			os.Exit(1)
 		}
