@@ -8,21 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//
-// --- Helpers ---
-//
-
 func setEnv(t *testing.T, key, value string) {
 	t.Helper()
 	t.Setenv(key, value)
 }
 
-//
-// --- TESTS ---
-//
-
 func TestLoadConfig_DefaultsApplied(t *testing.T) {
 	setEnv(t, "DATABASE_DSN", "postgres://user:pass@localhost/db")
+	setEnv(t, "SERVER_PORT", "")
+	setEnv(t, "RATE_LIMIT_REQUESTS", "")
+	setEnv(t, "RATE_LIMIT_WINDOW_SECONDS", "")
 
 	cfg, err := application.LoadConfig()
 	require.NoError(t, err)

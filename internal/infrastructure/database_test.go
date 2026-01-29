@@ -8,10 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//
-// --- Test: Missing DSN ---
-//
-
 func TestConnectDatabase_MissingDSN(t *testing.T) {
 	cfg := application.Config{
 		DatabaseDSN: "",
@@ -23,10 +19,6 @@ func TestConnectDatabase_MissingDSN(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "database: missing DSN")
 }
-
-//
-// --- Test: Invalid DSN (connection failure) ---
-//
 
 func TestConnectDatabase_InvalidDSN(t *testing.T) {
 	cfg := application.Config{

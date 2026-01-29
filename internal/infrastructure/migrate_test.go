@@ -10,20 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
-//
-// --- Test: db == nil ---
-//
-
 func TestMigrate_DBIsNil(t *testing.T) {
 	err := infrastructure.Migrate(nil)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "db is nil")
 }
-
-//
-// --- Test: AutoMigrate fails using a closed DB connection ---
-//
 
 func TestMigrate_AutoMigrateFails(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -38,10 +30,6 @@ func TestMigrate_AutoMigrateFails(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "migrate: auto-migrate failed")
 }
-
-//
-// --- Test: Successful migration ---
-//
 
 func TestMigrate_Success(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

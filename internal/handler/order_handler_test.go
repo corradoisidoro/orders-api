@@ -155,6 +155,18 @@ func TestOrderHandler_Create_InsertFails(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestOrderHandler_Create_MissingCustomerID(t *testing.T) {
+	h := OrderHandler{Repo: newMockRepo()}
+
+	body := map[string]any{}
+	req := newRequest(http.MethodPost, "/orders", body)
+	rr := newRecorder()
+
+	h.Create(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
 //
 // --- LIST ---
 //

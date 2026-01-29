@@ -49,6 +49,7 @@ func TestAppStart_ServerError(t *testing.T) {
 	err := app.Start(ctx)
 
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "server error")
 	assert.Contains(t, err.Error(), "boom")
 }
 
@@ -61,6 +62,7 @@ func TestAppStart_GracefulShutdown(t *testing.T) {
 	var db *gorm.DB
 	app := application.New(cfg, db)
 
+	// http.ErrServerClosed is treated as a normal shutdown by App.Start.
 	fake := &fakeServer{
 		listenErr: http.ErrServerClosed,
 	}
