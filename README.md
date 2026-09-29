@@ -22,10 +22,13 @@ PostgreSQL with migrations, rate limiting, and graceful shutdown.
 - CRUD for orders, with line items created and owned as part of the order
 - Offset-based pagination for the list endpoint
 - PostgreSQL with migrations and connection pooling
-- Graceful shutdown on SIGINT/SIGTERM, request logging, panic recovery,
-  per-request timeouts
+- Graceful shutdown on SIGINT/SIGTERM (HTTP server + database connection pool),
+  request logging, panic recovery, per-request timeouts
 - Config loader with validation and sensible defaults
 - Configurable per-client rate limiting
+- Health check endpoint returns JSON with database connectivity status
+- Linting with golangci-lint
+- Docker support (Dockerfile + docker-compose for local development)
 - Test suite with 90%+ coverage on the `application`, `handler`, `repository`,
   and `middleware` packages (`go test -race ./...`)
 
@@ -34,18 +37,24 @@ PostgreSQL with migrations, rate limiting, and graceful shutdown.
 ```
 .
 ├── cmd/api/            # Entrypoint + `migrate` subcommand
-└── internal/
-    ├── application/    # Config, dependency wiring, routes, server lifecycle
-    ├── handler/        # HTTP handlers and JSON helpers
-    ├── infrastructure/ # Database connection and migrations
-    ├── middleware/     # Rate limiting
-    ├── model/          # Domain types (GORM models)
-    └── repository/     # Persistence contract + implementation
+├── internal/
+│   ├── application/    # Config, dependency wiring, routes, server lifecycle
+│   ├── handler/        # HTTP handlers and JSON helpers
+│   ├── infrastructure/ # Database connection and migrations
+│   ├── middleware/     # Rate limiting
+│   ├── model/          # Domain types (GORM models)
+│   └── repository/     # Persistence contract + implementation
+├── Dockerfile           # Multi-stage container build
+├── docker-compose.yml   # Local development (API + PostgreSQL)
+├── Makefile             # Common dev tasks
+└── .golangci.yml        # Linting configuration
 ```
 
 ## Quick start
 
 Requires Go 1.25+ and PostgreSQL.
+
+### Option A: Local development
 
 1. Copy the example environment file and edit it:
 
@@ -63,22 +72,28 @@ Requires Go 1.25+ and PostgreSQL.
 2. Apply the migrations:
 
    ```bash
-   go run ./cmd/api migrate
+   make migrate
    ```
 
 3. Start the server:
 
    ```bash
-   go run ./cmd/api
-   # or build and run:
-   go build -o orders ./cmd/api && ./orders
+   make run
    ```
+
+### Option B: Docker Compose
+
+```bash
+docker compose up -d
+```
+
+This starts both the API and PostgreSQL. The API is available at `http://localhost:3000`.
 
 ## API
 
 | Method   | Path        | Description                                  |
 | -------- | ----------- | -------------------------------------------- |
-| `GET`    | `/`         | Health check                                 |
+| `GET`    | `/`         | Health check (returns JSON with DB status)   |
 | `POST`   | `/orders`   | Create an order with its line items           |
 | `GET`    | `/orders`   | List orders (`?cursor=<offset>`)              |
 | `GET`    | `/orders/{id}`  | Fetch a single order                      |
@@ -143,11 +158,23 @@ environment variables take precedence.
 ## Testing
 
 ```bash
+make test
+```
+
+Or directly:
+
+```bash
 go test ./... -race -cover
 ```
 
 Repository tests run against an in-memory SQLite database, so no PostgreSQL
 instance is required to run the suite.
+
+## Linting
+
+```bash
+make lint
+```
 
 ## License
 
