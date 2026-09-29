@@ -128,5 +128,5 @@ func (a *App) healthCheck(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	fmt.Fprintf(w, `{"status":"%s"}`, status)
+	_, _ = fmt.Fprintf(w, `{"status":"%s"}`, status)
 }

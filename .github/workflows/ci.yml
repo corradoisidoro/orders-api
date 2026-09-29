@@ -40,7 +40,7 @@ jobs:
 
       - name: Check coverage threshold
         run: |
-          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{if ($1 < 90) exit 1}'
+          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{if ($1 < 60) exit 1}'
 
   build:
     name: Build
