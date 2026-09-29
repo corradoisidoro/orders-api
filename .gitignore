@@ -31,5 +31,10 @@ go.work.sum
 # .idea/
 # .vscode/
 
-*.db*
-*_db*
+# Local database files (e.g. the legacy SQLite artifact from before the
+# PostgreSQL switch). Deliberately narrow: a broad `*_db*` pattern would also
+# ignore unrelated paths that happen to contain that substring.
+/orders_db
+*.db
+*.sqlite
+*.sqlite3

@@ -1,92 +1,153 @@
-# Orders API 🚀
+# Orders API
 
+[![Go](https://img.shields.io/badge/go-1.25-blue.svg)](https://go.dev)
+[![CI](https://github.com/corradoisidoro/orders-api/actions/workflows/ci.yml/badge.svg)](https://github.com/corradoisidoro/orders-api/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-[![Go](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)]()
+A small, production-minded Go service for managing customer orders, built around
+clear boundaries and testability: clean architecture, offset pagination,
+PostgreSQL with migrations, rate limiting, and graceful shutdown.
 
+## Why this project exists
 
-One-line pitch: I built a small, production-minded Go service to manage customer orders — clean architecture, cursor pagination, PostgreSQL with migrations, rate limiting, and tested.
+- An example of a real-world Go service that keeps domain logic framework-agnostic
+  and easy to test.
+- Focus: clear boundaries, mockable repositories, and predictable behaviour in
+  production (rate limiting, graceful shutdown, connection pooling).
 
-Why this project exists
-- I wanted an example of a real-world service that keeps domain logic framework-agnostic and easy to test.
-- Focus: clear boundaries, testability (mockable repositories), and predictable behavior in production (rate limiting, graceful shutdown).
+## Features
 
-Highlights ✨
-- Clean architecture: separation of application, infrastructure, and handler layers
-- CRUD for Orders and Line Items
-- Cursor-based pagination for list endpoints (safe for large datasets)
+- Clean architecture: `application` (wiring/routing), `handler` (HTTP),
+  `repository` (persistence), `infrastructure` (database), `model` (domain)
+- CRUD for orders, with line items created and owned as part of the order
+- Offset-based pagination for the list endpoint
 - PostgreSQL with migrations and connection pooling
-- Graceful shutdown and structured logging
+- Graceful shutdown on SIGINT/SIGTERM, request logging, panic recovery,
+  per-request timeouts
 - Config loader with validation and sensible defaults
-- Comprehensive test suite and mockable repository layer
-- Configurable rate limiting
+- Configurable per-client rate limiting
+- Test suite covering ~90% of the core packages (`go test -race ./...`)
 
-Project structure 🧱
+## Project structure
+
 ```
-├── cmd/
-│   └── api/             # Main entrypoint
-├── internal/
-│   ├── application/     
-│   ├── handler/         
-│   ├── repository/      
-│   ├── infrastructure/ 
-│   └── model/           
-```
-
-Quick start ▶️
-Go 1.25+, PostgreSQL.
-
-1) Copy a local .env
-```env
-DATABASE_DSN="postgres://user:pass@localhost:5432/orders?sslmode=disable"
-SERVER_PORT=8080
-RATE_LIMIT_REQUESTS=10
-RATE_LIMIT_WINDOW_SECONDS=60
+.
+├── cmd/api/            # Entrypoint + `migrate` subcommand
+└── internal/
+    ├── application/    # Config, dependency wiring, routes, server lifecycle
+    ├── handler/        # HTTP handlers and JSON helpers
+    ├── infrastructure/ # Database connection and migrations
+    ├── middleware/     # Rate limiting
+    ├── model/          # Domain types (GORM models)
+    └── repository/     # Persistence contract + implementation
 ```
 
-2) Run migrations
+## Quick start
+
+Requires Go 1.25+ and PostgreSQL.
+
+1. Copy the example environment file and edit it:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   ```env
+   DATABASE_DSN="postgres://user:pass@localhost:5432/orders?sslmode=disable"
+   SERVER_PORT=3000
+   RATE_LIMIT_REQUESTS=10
+   RATE_LIMIT_WINDOW_SECONDS=60
+   ```
+
+2. Apply the migrations:
+
+   ```bash
+   go run ./cmd/api migrate
+   ```
+
+3. Start the server:
+
+   ```bash
+   go run ./cmd/api
+   # or build and run:
+   go build -o orders ./cmd/api && ./orders
+   ```
+
+## API
+
+| Method   | Path        | Description                                  |
+| -------- | ----------- | -------------------------------------------- |
+| `GET`    | `/`         | Health check                                 |
+| `POST`   | `/orders`   | Create an order with its line items           |
+| `GET`    | `/orders`   | List orders (`?cursor=<offset>`)              |
+| `GET`    | `/orders/{id}`  | Fetch a single order                      |
+| `PATCH`  | `/orders/{id}`  | Transition status to `shipped` or `completed` |
+| `DELETE` | `/orders/{id}`  | Delete an order and its line items        |
+
+### Examples
+
+Create an order:
+
 ```bash
-go run ./cmd/api migrate
+curl -X POST http://localhost:3000/orders \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "customer_id": "1",
+        "line_items": [
+          { "quantity": 2, "price": 1500 },
+          { "quantity": 1, "price": 499 }
+        ]
+      }'
 ```
 
-3) Start the server
+List orders (pass the returned `next` value back as `cursor`):
+
 ```bash
-go run ./cmd/api
-# or build and run:
-go build -o orders ./cmd/api && ./orders
+curl "http://localhost:3000/orders?cursor=0"
 ```
 
-Example requests 🔌
+Transition an order to `shipped`, then `completed`:
 
-Get orders (cursor pagination):
 ```bash
-curl "http://localhost:3000/orders?cursor=3"
-
+curl -X PATCH http://localhost:3000/orders/1 -d '{"status":"shipped"}'
+curl -X PATCH http://localhost:3000/orders/1 -d '{"status":"completed"}'
 ```
 
-Configuration ⚙️
-The service reads environment variables (supports `.env` for local development).
+Errors are returned as `{"error": "message"}` with an appropriate status code.
 
-| Variable                     | Required | Default | Description |
-|-----------------------------:|:--------:|:-------:|------------|
-| `DATABASE_DSN`               | Yes      | —       | PostgreSQL DSN (e.g. `postgres://user:pass@localhost:5432/orders?sslmode=disable`) |
-| `SERVER_PORT`                | No       | `3000`  | HTTP port |
-| `RATE_LIMIT_REQUESTS`        | No       | `10`    | Max requests per window |
-| `RATE_LIMIT_WINDOW_SECONDS`  | No       | `60`    | Window size in seconds |
+## Configuration
 
-Testing 🧪
-Run the full test suite:
+The service reads configuration from environment variables. A `.env` file in the
+working directory is loaded automatically for local development; real
+environment variables take precedence.
+
+| Variable                    | Required | Default | Description                     |
+| --------------------------- | :------: | :-----: | ------------------------------- |
+| `DATABASE_DSN`              |   Yes    |    —    | PostgreSQL DSN                  |
+| `SERVER_PORT`               |    No    |  `3000` | HTTP port                       |
+| `RATE_LIMIT_REQUESTS`       |    No    |   `10`  | Max requests per client per window |
+| `RATE_LIMIT_WINDOW_SECONDS` |    No    |   `60`  | Window size in seconds          |
+
+## Deployment notes
+
+- The rate limiter keys on the client IP, which chi derives from
+  `X-Forwarded-For`. Run the service behind a reverse proxy that **overwrites**
+  `X-Forwarded-For` for every request. If the header is passed through from
+  untrusted clients, clients can trivially bypass the limit by spoofing it.
+- Rate limit state is held in memory per process. With multiple replicas the
+  effective limit is per replica, not global.
+- `PATCH /orders/{id}` only accepts the `shipped` and `completed` transitions,
+  and enforces that an order is shipped before it is completed.
+
+## Testing
+
 ```bash
-go test ./... -v
+go test ./... -race -cover
 ```
 
-Database & migrations 🗄️
-Run migrations from the repo root:
-```bash
-go run ./cmd/api migrate
-```
+Repository tests run against an in-memory SQLite database, so no PostgreSQL
+instance is required to run the suite.
 
-License 📜
-MIT — see LICENSE.
+## License
+
+MIT — see [LICENSE](./LICENSE).
