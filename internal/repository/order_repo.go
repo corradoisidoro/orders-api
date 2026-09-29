@@ -39,7 +39,10 @@ func (r *OrderRepo) FindAll(ctx context.Context, page Page) (Result, error) {
 
 	var orders []model.Order
 
-	query := r.DB.WithContext(ctx).Offset(int(page.Offset))
+	// Order by a stable, unique column. Without this, the database is free to
+	// return rows in any order, and LIMIT/OFFSET pagination can silently skip
+	// and repeat rows across pages.
+	query := r.DB.WithContext(ctx).Order(orderIDColumn).Offset(int(page.Offset))
 	if page.Size > 0 {
 		query = query.Limit(int(page.Size))
 	}

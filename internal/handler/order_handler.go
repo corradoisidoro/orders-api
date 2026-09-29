@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 	"time"
 
@@ -19,13 +18,13 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 		LineItems  []model.LineItem `json:"line_items"`
 	}
 
-	if err := decodeJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid JSON body", err)
 		return
 	}
 
 	if body.CustomerID <= 0 {
-		writeError(w, http.StatusBadRequest, "customer_id must be > 0")
+		writeError(w, r, http.StatusBadRequest, "customer_id must be > 0", nil)
 		return
 	}
 
@@ -38,7 +37,7 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Repo.Insert(r.Context(), &o); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create order")
+		writeRepoError(w, r, err, "failed to create order")
 		return
 	}
 
@@ -63,7 +62,7 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 		Size:   defaultPageSize,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list orders")
+		writeRepoError(w, r, err, "failed to list orders")
 		return
 	}
 
@@ -92,11 +91,7 @@ func (h *OrderHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	o, err := h.Repo.FindByID(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotExist) {
-			writeError(w, http.StatusNotFound, "order not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to retrieve order")
+		writeRepoError(w, r, err, "failed to retrieve order")
 		return
 	}
 
@@ -112,8 +107,8 @@ func (h *OrderHandler) UpdateByID(w http.ResponseWriter, r *http.Request) {
 		Status string `json:"status"`
 	}
 
-	if err := decodeJSON(r, &body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid JSON body", err)
 		return
 	}
 
@@ -124,11 +119,7 @@ func (h *OrderHandler) UpdateByID(w http.ResponseWriter, r *http.Request) {
 
 	o, err := h.Repo.FindByID(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotExist) {
-			writeError(w, http.StatusNotFound, "order not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to retrieve order")
+		writeRepoError(w, r, err, "failed to retrieve order")
 		return
 	}
 
@@ -137,29 +128,29 @@ func (h *OrderHandler) UpdateByID(w http.ResponseWriter, r *http.Request) {
 	switch body.Status {
 	case "shipped":
 		if o.ShippedAt != nil {
-			writeError(w, http.StatusBadRequest, "order already shipped")
+			writeError(w, r, http.StatusBadRequest, "order already shipped", nil)
 			return
 		}
 		o.ShippedAt = &now
 
 	case "completed":
 		if o.ShippedAt == nil {
-			writeError(w, http.StatusBadRequest, "order must be shipped before completion")
+			writeError(w, r, http.StatusBadRequest, "order must be shipped before completion", nil)
 			return
 		}
 		if o.CompletedAt != nil {
-			writeError(w, http.StatusBadRequest, "order already completed")
+			writeError(w, r, http.StatusBadRequest, "order already completed", nil)
 			return
 		}
 		o.CompletedAt = &now
 
 	default:
-		writeError(w, http.StatusBadRequest, "invalid status")
+		writeError(w, r, http.StatusBadRequest, "invalid status", nil)
 		return
 	}
 
 	if err := h.Repo.UpdateByID(r.Context(), &o); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update order")
+		writeRepoError(w, r, err, "failed to update order")
 		return
 	}
 
@@ -172,13 +163,8 @@ func (h *OrderHandler) DeleteByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.Repo.DeleteByID(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotExist) {
-			writeError(w, http.StatusNotFound, "order not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "failed to delete order")
+	if err := h.Repo.DeleteByID(r.Context(), id); err != nil {
+		writeRepoError(w, r, err, "failed to delete order")
 		return
 	}
 
