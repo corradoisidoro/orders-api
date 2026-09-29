@@ -1,7 +1,6 @@
 # Orders API
 
 [![Go](https://img.shields.io/badge/go-1.25-blue.svg)](https://go.dev)
-[![CI](https://github.com/corradoisidoro/orders-api/actions/workflows/ci.yml/badge.svg)](https://github.com/corradoisidoro/orders-api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 A small, production-minded Go service for managing customer orders, built around
