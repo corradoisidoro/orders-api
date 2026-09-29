@@ -72,6 +72,7 @@ func (a *App) Start(ctx context.Context) error {
 	select {
 	case err := <-errCh:
 		// Server failed unexpectedly.
+		a.closeDB()
 		return err
 
 	case <-ctx.Done():
@@ -82,13 +83,50 @@ func (a *App) Start(ctx context.Context) error {
 		log.Println("Shutting down server...")
 		if err := server.Shutdown(timeoutCtx); err != nil {
 			log.Printf("shutdown error: %v", err)
+			a.closeDB()
 			return err
 		}
 
+		a.closeDB()
 		return nil
+	}
+}
+
+// closeDB gracefully closes the database connection pool.
+func (a *App) closeDB() {
+	if a.DB == nil {
+		return
+	}
+	sqlDB, err := a.DB.DB()
+	if err != nil {
+		log.Printf("failed to get sql.DB: %v", err)
+		return
+	}
+	if err := sqlDB.Close(); err != nil {
+		log.Printf("failed to close database: %v", err)
 	}
 }
 
 func (a *App) Router() http.Handler {
 	return a.router
+}
+
+func (a *App) healthCheck(w http.ResponseWriter, r *http.Request) {
+	status := "ok"
+	code := http.StatusOK
+
+	if a.DB != nil {
+		sqlDB, err := a.DB.DB()
+		if err != nil {
+			status = "error"
+			code = http.StatusServiceUnavailable
+		} else if err := sqlDB.PingContext(r.Context()); err != nil {
+			status = "error"
+			code = http.StatusServiceUnavailable
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	fmt.Fprintf(w, `{"status":"%s"}`, status)
 }

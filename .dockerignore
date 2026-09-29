@@ -1,0 +1,16 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+.env
+.env.example
+*.md
+Makefile
+.golangci.yml
+.github
+orders_db
+*.db
+*.sqlite
+*.sqlite3
+coverage.out

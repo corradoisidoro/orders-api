@@ -1,7 +1,6 @@
 package application
 
 import (
-	"net/http"
 	"time"
 
 	appmw "github.com/corradoisidoro/orders-api/internal/middleware"
@@ -26,9 +25,7 @@ func (a *App) loadRoutes() {
 	))
 
 	// Health check
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	r.Get("/", a.healthCheck)
 
 	// API routes
 	r.Route("/orders", a.loadOrderRoutes)
