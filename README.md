@@ -26,7 +26,8 @@ PostgreSQL with migrations, rate limiting, and graceful shutdown.
   per-request timeouts
 - Config loader with validation and sensible defaults
 - Configurable per-client rate limiting
-- Test suite covering ~90% of the core packages (`go test -race ./...`)
+- Test suite with 90%+ coverage on the `application`, `handler`, `repository`,
+  and `middleware` packages (`go test -race ./...`)
 
 ## Project structure
 
